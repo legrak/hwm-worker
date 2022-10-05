@@ -1,10 +1,15 @@
 import { Page } from "playwright-core";
 import { runWithHumanDelayEmulation } from "../../helpers";
 import { selectors } from "./selectors";
-import { AvailableJobInfo } from "./types";
+import { JobInfo } from "./types";
 
 export class StartWorkingDriver {
   constructor(private page: Page) {}
+
+  public async notWorkingHintShown(): Promise<boolean> {
+    const notWorkingHint = await this.page.$(selectors.notWorkingHint);
+    return notWorkingHint !== null;
+  }
 
   public async goToMap() {
     await runWithHumanDelayEmulation([
@@ -26,18 +31,22 @@ export class StartWorkingDriver {
     await this.page.click(selectors.miningJobsList);
   }
 
-  public async getAvailableJobsList(): Promise<AvailableJobInfo[]> {
-    const availableJobsPrices = await this.page.$$(
-      selectors.availableJobPrices
-    );
+  public async getAvailableJobsList(): Promise<JobInfo[]> {
+    const jobItems = await this.page.$$(selectors.jobsItems);
 
     return await Promise.all(
-      availableJobsPrices.map((item, index) => {
-        return new Promise<AvailableJobInfo>((resolve) => {
+      jobItems.map((item, index) => {
+        return new Promise<JobInfo>((resolve) => {
           (async function () {
-            const price = await item.textContent();
+            const priceItem = await item.$(selectors.jobPrice);
+            const priceInnerText = await priceItem?.innerText();
+            const price = Number(priceInnerText);
 
-            resolve({ price: Number(price), index });
+            const linkItem = await item.$(selectors.jobLink);
+            const linkText = await linkItem?.innerText();
+            const isAvailable = linkText?.trim() === "»»»";
+
+            resolve({ isAvailable, price, index });
           })();
         });
       })
@@ -46,6 +55,7 @@ export class StartWorkingDriver {
 
   public async goToJob(index: number) {
     const jobsLinks = await this.page.$$(selectors.availableJobLinks);
+
     const desiredJobLink = jobsLinks[index];
     if (!desiredJobLink) {
       throw Error("there is no specified job available");

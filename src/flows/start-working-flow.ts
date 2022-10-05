@@ -12,6 +12,11 @@ export class StartWorkingFlow implements Flow {
 
   public async run(page: Page) {
     const driver = new StartWorkingDriver(page);
+
+    if (!(await driver.notWorkingHintShown())) {
+      return;
+    }
+
     await driver.goToMap();
 
     const possibleJobsListsNavigation = [
@@ -27,7 +32,9 @@ export class StartWorkingFlow implements Flow {
         for (const jobListNavigation of possibleJobsListsNavigation) {
           await jobListNavigation();
 
-          const availableJobs = await driver.getAvailableJobsList();
+          const availableJobs = (await driver.getAvailableJobsList()).filter(
+            (j) => j.isAvailable
+          );
           if (availableJobs.length > 0) {
             availableJobs.sort(({ price: a }, { price: b }) => {
               return b - a;
